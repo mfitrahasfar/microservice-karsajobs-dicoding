@@ -7,11 +7,16 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install hadolint
+          name: Install hadolint (no sudo, add to PATH)
           command: |
-            curl -sSL -o /usr/local/bin/hadolint \
-              https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
-            chmod +x /usr/local/bin/hadolint
+            set -euo pipefail
+            mkdir -p "$HOME/bin"
+            curl -fsSL --retry 5 -o "$HOME/bin/hadolint" \
+              https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+            chmod +x "$HOME/bin/hadolint"
+            echo 'export PATH="$HOME/bin:$PATH"' >> "$BASH_ENV"
+            source "$BASH_ENV"
+            hadolint --version
       - run:
           name: Lint Dockerfile
           command: hadolint Dockerfile
@@ -43,18 +48,19 @@ jobs:
       - run:
           name: Build image (tag commit & latest)
           command: |
+            set -euo pipefail
             SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
             docker build -t "${IMAGE_NAME}:${SHORT_SHA}" -t "${IMAGE_NAME}:latest" -f Dockerfile .
       - run:
           name: Push image
           command: |
+            set -euo pipefail
             SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
             docker push "${IMAGE_NAME}:${SHORT_SHA}"
             docker push "${IMAGE_NAME}:latest"
 
 workflows:
   karsajobs_pipeline:
-#    when: << pipeline.parameters.run_backend | default(true) >>
     jobs:
       - lint-dockerfile:
           filters:
