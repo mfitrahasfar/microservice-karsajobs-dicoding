@@ -40,8 +40,8 @@ jobs:
       IMAGE_NAME: ghcr.io/${GHCR_USER}/karsajobs
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.18
+      - setup_remote_docker:            # ⬅️ HAPUS 'version', biarkan default
+          docker_layer_caching: false   # boleh true jika akun mendukung DLC
       - run:
           name: Login GHCR
           command: echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -63,16 +63,10 @@ workflows:
   karsajobs_pipeline:
     jobs:
       - lint-dockerfile:
-          filters:
-            branches:
-              only: karsajobs
+          filters: { branches: { only: karsajobs } }
       - test-app:
           requires: [lint-dockerfile]
-          filters:
-            branches:
-              only: karsajobs
+          filters: { branches: { only: karsajobs } }
       - build-app-karsajobs:
           requires: [test-app]
-          filters:
-            branches:
-              only: karsajobs
+          filters: { branches: { only: karsajobs } }
