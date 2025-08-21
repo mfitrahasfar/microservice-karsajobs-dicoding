@@ -54,7 +54,7 @@ jobs:
 
 workflows:
   karsajobs_pipeline:
-    when: << pipeline.parameters.run_backend | default(true) >>
+#    when: << pipeline.parameters.run_backend | default(true) >>
     jobs:
       - lint-dockerfile:
           filters:
