@@ -1,0 +1,72 @@
+version: 2.1
+
+jobs:
+  lint-dockerfile:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Install hadolint
+          command: |
+            curl -sSL -o /usr/local/bin/hadolint \
+              https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+            chmod +x /usr/local/bin/hadolint
+      - run:
+          name: Lint Dockerfile
+          command: hadolint Dockerfile
+
+  test-app:
+    docker:
+      - image: cimg/go:1.21
+    steps:
+      - checkout
+      - run:
+          name: Download go modules
+          command: go mod download
+      - run:
+          name: Run unit tests (short)
+          command: go test -v -short --count=1 $(go list ./...)
+
+  build-app-karsajobs:
+    docker:
+      - image: cimg/base:stable
+    environment:
+      IMAGE_NAME: ghcr.io/${GHCR_USER}/karsajobs
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.18
+      - run:
+          name: Login GHCR
+          command: echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+      - run:
+          name: Build image (tag commit & latest)
+          command: |
+            SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
+            docker build -t "${IMAGE_NAME}:${SHORT_SHA}" -t "${IMAGE_NAME}:latest" -f Dockerfile .
+      - run:
+          name: Push image
+          command: |
+            SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
+            docker push "${IMAGE_NAME}:${SHORT_SHA}"
+            docker push "${IMAGE_NAME}:latest"
+
+workflows:
+  karsajobs_pipeline:
+    when: << pipeline.parameters.run_backend | default(true) >>
+    jobs:
+      - lint-dockerfile:
+          filters:
+            branches:
+              only: karsajobs
+      - test-app:
+          requires: [lint-dockerfile]
+          filters:
+            branches:
+              only: karsajobs
+      - build-app-karsajobs:
+          requires: [test-app]
+          filters:
+            branches:
+              only: karsajobs
