@@ -27,7 +27,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Download go modules
+          name: Download Go modules
           command: go mod download
       - run:
           name: Run unit tests (short)
@@ -36,12 +36,10 @@ jobs:
   build-app-karsajobs:
     docker:
       - image: cimg/base:stable
-    environment:
-      IMAGE_NAME: ghcr.io/${GHCR_USER}/karsajobs
     steps:
       - checkout
-      - setup_remote_docker:            # ⬅️ HAPUS 'version', biarkan default
-          docker_layer_caching: false   # boleh true jika akun mendukung DLC
+      - setup_remote_docker:            # gunakan Docker daemon default CircleCI
+          docker_layer_caching: false
       - run:
           name: Login GHCR
           command: echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -49,13 +47,20 @@ jobs:
           name: Build image (tag commit & latest)
           command: |
             set -euo pipefail
+            GHCR_USER_LC=$(echo "$GHCR_USER" | tr '[:upper:]' '[:lower:]')   # paksa lowercase
+            IMAGE_NAME="ghcr.io/${GHCR_USER_LC}/karsajobs"
             SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
+
+            echo "Building ${IMAGE_NAME}:${SHORT_SHA} and :latest"
             docker build -t "${IMAGE_NAME}:${SHORT_SHA}" -t "${IMAGE_NAME}:latest" -f Dockerfile .
       - run:
           name: Push image
           command: |
             set -euo pipefail
+            GHCR_USER_LC=$(echo "$GHCR_USER" | tr '[:upper:]' '[:lower:]')
+            IMAGE_NAME="ghcr.io/${GHCR_USER_LC}/karsajobs"
             SHORT_SHA=$(echo "$CIRCLE_SHA1" | cut -c1-7)
+
             docker push "${IMAGE_NAME}:${SHORT_SHA}"
             docker push "${IMAGE_NAME}:latest"
 
@@ -63,10 +68,16 @@ workflows:
   karsajobs_pipeline:
     jobs:
       - lint-dockerfile:
-          filters: { branches: { only: karsajobs } }
+          filters:
+            branches:
+              only: karsajobs
       - test-app:
           requires: [lint-dockerfile]
-          filters: { branches: { only: karsajobs } }
+          filters:
+            branches:
+              only: karsajobs
       - build-app-karsajobs:
           requires: [test-app]
-          filters: { branches: { only: karsajobs } }
+          filters:
+            branches:
+              only: karsajobs
